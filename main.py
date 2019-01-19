@@ -6,7 +6,8 @@
 2.当检测到小车的圆时，锁定小车。
 '''
 import sensor,image,time
-from pyb import UART,LED
+from pyb import UART,LED,Timer
+threshold_black=[(0,100)]
 #判断是否检测到小车，若检测到，则锁定小车，若没有则锁定场地圆
 def find_car(circles):
     global front_circle,current_circle,g_mode
@@ -55,7 +56,13 @@ def lock_car(circles):
 
 #打包数据
 def pack_data():
+    global current_circle
+
     img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
+
+#时钟回调
+def over_time():
+    pack_data()
 
 class CIRCLE(object):
     x=0
@@ -65,25 +72,32 @@ class CIRCLE(object):
 g_mode=0        #0模式时，为锁定场地上的圆
 front_circle=CIRCLE()
 current_circle=CIRCLE()
+flag=0
 #摄像头传感器设置
 sensor.reset()
-sensor.set_pixformat(sensor.RGB565)
+sensor.set_pixformat(sensor.GRAYSCALE)
 sensor.set_framesize(sensor.QQQVGA)     #QQQVG:80*60
 sensor.skip_frames(time=2000)           #略过前两秒的数据
 sensor.set_auto_gain(False)
 sensor.set_auto_whitebal(False)
+#串口设置
+uart=UART(3,115200)
+uart.init(115200,bits=8,parity=None,stop=1)
+#时钟设置
+timer=Timer(4)
+timer.init(freq=20)
+timer.callback(over_time)
 clock=time.clock()
 
 while True:
     clock.tick()
     #修正镜头畸变
-    img=sensor.snapshot()
+    img=sensor.snapshot().lens_corr(1.8)
+    img.binary(threshold_black)
     c=img.find_circles(threshold=4000,x_margin=10,y_margin=10,r_margin=10)
     if c:
         if g_mode==0:
             find_car(c)
-            pack_data()
         elif g_mode==1:
             lock_car(c)
-            pack_data()
     print(clock.fps())
