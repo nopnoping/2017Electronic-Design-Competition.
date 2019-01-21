@@ -67,18 +67,21 @@ def pack_data():
     global current_circle,g_mode,g_find_car
     #锁定场地圆
     if g_mode==0:
-        SUM=(0xBB+0x05+current_circle.x+current.y)&0xff
-        temp=struct.pack("<BBBB",
-                            0xBB,
-                            0x05,
+        SUM=(0xBB+0x60+0x06+0xBF+0x02+current_circle.x+current_circle.y)&0xff
+        temp=struct.pack("<BBBBBBBB",
+                            0xBB,       #帧头
+                            0x60,       #源地址
+                            0x06,       #目标地址
+                            0xBF,       #功能号
+                            0x02,       #数据长度
                             current_circle.x,
                             current_circle.y,
-                            SUM)
+                            SUM)        #校验和
         uart.write(temp)
     #寻找小车，控制场地圆的x坐标不变，控制y坐标，使飞机向前飞
     elif g_mode==1 and g_find_car==0:
         SUM=(0xBB+0x05+current_circle.x+25)&0xff
-        temp=struct.pack("<BBBB",
+        temp=struct.pack("<BBBBB",
                             0xBB,
                             0x05,
                             current_circle.x,
@@ -87,8 +90,8 @@ def pack_data():
         uart.write(temp)
     #锁定小车
     elif g_mode==1 and g_find_car==1:
-        SUM=(0xBB+0x05+current_circle.x+current.y)&0xff
-        temp=struct.pack("<BBBB",
+        SUM=(0xBB+0x05+current_circle.x+current_circle.y)&0xff
+        temp=struct.pack("<BBBBB",
                             0xBB,
                             0x05,
                             current_circle.x,
@@ -131,6 +134,8 @@ uart.init(115200,bits=8,parity=None,stop=1)
 #时钟设置
 timer=Timer(4,freq=20)
 timer.callback(over_time)
+led2=LED(2)
+led2.on()
 clock=time.clock()
 
 while True:
@@ -138,17 +143,17 @@ while True:
     #修正镜头畸变
     img=sensor.snapshot().lens_corr(1.8)
     #img.binary(threshold_black)
-    c=img.find_circles(threshold=3000,x_margin=10,y_margin=10,r_margin=10)
+    c=img.find_circles(threshold=4000,x_margin=10,y_margin=10,r_margin=10)
     if c and flag:
         flag=False
         if g_mode==0:
             print("锁定场地圆")
             lock_place_circle(c)
-            #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
             pack_data()
+            #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
         elif g_mode==1:
             lock_car(c)
+            pack_data()
             #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
     #print(flag)
-    #print(len(c))
     #print(clock.fps())
