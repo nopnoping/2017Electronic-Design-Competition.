@@ -1,4 +1,4 @@
-#Camera control - By:Simon  - V1.0 1.17 2019  - V1.1 1.20 2019
+#Camera control - By:Simon  - V1.0 1.17 2019  - V1.1 1.20 2019 -V1.2 1.25 2019 添加模式转换
 '''
 2017国赛飞行器摄像头代码
 实现功能：
@@ -67,42 +67,91 @@ def pack_data():
     global current_circle,g_mode,g_find_car
     #锁定场地圆
     if g_mode==0:
-        SUM=(0xBB+0x60+0x06+0xBF+0x02+current_circle.x+current_circle.y)&0xff
-        temp=struct.pack("<BBBBBBBB",
+        x_high=(current_circle.x&0xff00)>>8
+        x_low=current_circle.x&0xff
+        y_high=(current_circle.y&0xff00)>>8
+        y_low=current_circle.y&0xff
+        SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
+        temp=struct.pack("<BBBBBBBBBB",
                             0xBB,       #帧头
                             0x60,       #源地址
                             0x06,       #目标地址
                             0xBF,       #功能号
-                            0x02,       #数据长度
-                            current_circle.x,
-                            current_circle.y,
+                            0x04,       #数据长度
+                            x_high,
+                            x_low,
+                            y_high,
+                            y_low,
                             SUM)        #校验和
         uart.write(temp)
     #寻找小车，控制场地圆的x坐标不变，控制y坐标，使飞机向前飞
     elif g_mode==1 and g_find_car==0:
-        SUM=(0xBB+0x05+current_circle.x+25)&0xff
-        temp=struct.pack("<BBBBB",
-                            0xBB,
-                            0x05,
-                            current_circle.x,
-                            25,
-                            SUM)
+        x_high=(current_circle.x&0xff00)>>8
+        x_low=current_circle.x&0xff
+        y_high=0
+        y_low=25
+        SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
+        temp=struct.pack("<BBBBBBBBBB",
+                            0xBB,       #帧头
+                            0x60,       #源地址
+                            0x06,       #目标地址
+                            0xBF,       #功能号
+                            0x04,       #数据长度
+                            x_high,
+                            x_low,
+                            y_high,
+                            y_low,
+                            SUM)        #校验和
         uart.write(temp)
     #锁定小车
     elif g_mode==1 and g_find_car==1:
-        SUM=(0xBB+0x05+current_circle.x+current_circle.y)&0xff
-        temp=struct.pack("<BBBBB",
-                            0xBB,
-                            0x05,
-                            current_circle.x,
-                            current_circle.y,
-                            SUM)
+        x_high=(current_circle.x&0xff00)>>8
+        x_low=current_circle.x&0xff
+        y_high=(current_circle.y&0xff00)>>8
+        y_low=current_circle.y&0xff
+        SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
+        temp=struct.pack("<BBBBBBBBBB",
+                            0xBB,       #帧头
+                            0x60,       #源地址
+                            0x06,       #目标地址
+                            0xBF,       #功能号
+                            0x04,       #数据长度
+                            x_high,
+                            x_low,
+                            y_high,
+                            y_low,
+                            SUM)        #校验和
         uart.write(temp)
+#确认收到数据
+def confirm_data():
+    SUM=(0xBB+0x60+0x06+0xBC+0x01+0x01)&0xff
+    temp=struct.pack("<BBBBBBB",
+                        0xBB,
+                        0x60,
+                        0x06,
+                        0xBC,
+                        0x01,
+                        0x01,
+                        SUM)
+    uart.write(temp)
 #接受数据
 def receive_data():
+    global g_mode,g_find_car,g_find_place_circle,g_find_flag
     if uart.any():
         a=uart.read()
         '''检验数据帧头'''
+        if a[0]==0xBB and a[1]==0x60 and a[2]==06:
+            mode=a[5]
+            SUM=a[0]+a[1]+a[2]+a[3]+a[4]+a[5]
+            if SUM==a[6]:
+                confirm_data()
+                if mode==1:
+                    g_mode=0
+                elif mode==2:
+                    g_mode=1
+                    g_find_car=0
+                    g_find_place_circle=0
+                    g_find_flag=0
 
 #时钟回调
 def over_time(timer):
@@ -144,16 +193,23 @@ while True:
     img=sensor.snapshot().lens_corr(1.8)
     #img.binary(threshold_black)
     c=img.find_circles(threshold=4000,x_margin=10,y_margin=10,r_margin=10)
-    if c and flag:
-        flag=False
+    find_circle=False
+    if c:
+        find_circle=True
         if g_mode==0:
             print("锁定场地圆")
             lock_place_circle(c)
-            pack_data()
+            #pack_data()
             #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
         elif g_mode==1:
             lock_car(c)
-            pack_data()
             #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
+    if flag:
+        flag=False
+        receive_data()
+        if find_circle:
+            find_circle=False
+            pack_data()
+
     #print(flag)
     #print(clock.fps())
