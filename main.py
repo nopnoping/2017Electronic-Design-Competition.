@@ -37,6 +37,7 @@ def lock_place_circle(circles):
 def lock_car(circles):
     global front_circle,current_circle,g_find_car,g_find_place_circle,g_find_flag
     if g_find_car==0:
+        #print("寻找小车")
         #寻找小车
         i=0
         for c in circles:
@@ -55,12 +56,10 @@ def lock_car(circles):
                     current_circle.x=c.x()
                     current_circle.y=c.y()
                     current_circle.r=c.r()
-            return_fc_find_car()
         #图片中只有一个圆时，判断y坐标的偏移
         elif i==1:
             if abs(current_circle.y-front_circle.y)>15 and g_find_flag:
                 g_find_car=1
-                return_fc_find_car()
         if g_find_place_circle:
             g_find_flag=1
         front_circle.x=current_circle.x
@@ -68,6 +67,8 @@ def lock_car(circles):
         front_circle.r=current_circle.r
         #锁定小车
     elif g_find_car==1:
+        #print("锁定小车")
+        return_fc_find_car()
         current_circle.x=500
         current_circle.y=500
         for c in circles:
@@ -167,8 +168,6 @@ def receive_data():
                     g_find_flag=0
                 elif mode==2:
                     g_mode=1
-
-
 #时钟回调
 def over_time(timer):
     global flag
@@ -208,7 +207,7 @@ clock=time.clock()
 while True:
     #修正镜头畸变
     img=sensor.snapshot().lens_corr(1.8)
-    c=img.find_circles(threshold=4000,x_margin=10,y_margin=10,r_margin=10)
+    c=img.find_circles(threshold=3500,x_margin=10,y_margin=10,r_margin=10)
     find_circle=False
     if c:
         find_circle=True
@@ -220,7 +219,24 @@ while True:
             lock_car(c)
     if flag:
         flag=False
-        receive_data()
+        #receive_data()
+        if uart.any()==7:
+            a=1
+        '''
+            a=uart.readline()
+            if a[0]==0xBB and a[1]==0x60 and a[2]==0x06:
+                mode=a[5]
+                SUM=(a[0]+a[1]+a[2]+a[3]+a[4]+a[5])&0xff
+                if SUM==a[6]:
+                    confirm_data()
+                    if mode==1:
+                        g_mode=0
+                        g_find_car=0
+                        g_find_place_circle=0
+                        g_find_flag=0
+                    elif mode==2:
+                        g_mode=1
+                        '''
         if g_mode==0:
             led2.on()
             led3.off()
@@ -230,3 +246,5 @@ while True:
         if find_circle:
             find_circle=False
             pack_data()
+        #if g_mode==1 and g_find_car==1:
+            #return_fc_find_car()
