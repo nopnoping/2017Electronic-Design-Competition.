@@ -74,8 +74,8 @@ def pack_data():
         SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
         temp=struct.pack("<BBBBBBBBBB",
                             0xBB,       #帧头
-                            0x60,       #源地址
-                            0x06,       #目标地址
+                            0x06,       #源地址
+                            0x60,       #目标地址
                             0xBF,       #功能号
                             0x04,       #数据长度
                             x_high,
@@ -93,8 +93,8 @@ def pack_data():
         SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
         temp=struct.pack("<BBBBBBBBBB",
                             0xBB,       #帧头
-                            0x60,       #源地址
-                            0x06,       #目标地址
+                            0x06,       #源地址
+                            0x60,       #目标地址
                             0xBF,       #功能号
                             0x04,       #数据长度
                             x_high,
@@ -112,8 +112,8 @@ def pack_data():
         SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
         temp=struct.pack("<BBBBBBBBBB",
                             0xBB,       #帧头
-                            0x60,       #源地址
-                            0x06,       #目标地址
+                            0x06,       #源地址
+                            0x60,       #目标地址
                             0xBF,       #功能号
                             0x04,       #数据长度
                             x_high,
@@ -127,8 +127,8 @@ def confirm_data():
     SUM=(0xBB+0x60+0x06+0xBC+0x01+0x01)&0xff
     temp=struct.pack("<BBBBBBB",
                         0xBB,
-                        0x60,
                         0x06,
+                        0x60,
                         0xBC,
                         0x01,
                         0x01,
@@ -140,11 +140,11 @@ def receive_data():
     if uart.any():
         a=uart.read()
         '''检验数据帧头'''
-        if a[0]==0xBB and a[1]==0x60 and a[2]==06:
+        if a[0]==0xBB and a[1]==0x60 and a[2]==0x06:
             mode=a[5]
             SUM=a[0]+a[1]+a[2]+a[3]+a[4]+a[5]
             if SUM==a[6]:
-                confirm_data()
+                #confirm_data()
                 if mode==1:
                     g_mode=0
                 elif mode==2:
@@ -185,6 +185,8 @@ timer=Timer(4,freq=20)
 timer.callback(over_time)
 led2=LED(2)
 led2.on()
+led3=LED(3)
+led3.off()
 clock=time.clock()
 
 while True:
@@ -197,19 +199,23 @@ while True:
     if c:
         find_circle=True
         if g_mode==0:
-            print("锁定场地圆")
+            led2.on()
+            led3.off()
+            #print("锁定场地圆")
             lock_place_circle(c)
             #pack_data()
             #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
         elif g_mode==1:
+            led2.off()
+            led3.on()
             lock_car(c)
             #img.draw_circle(current_circle.x,current_circle.y,current_circle.r,color=(255,0,0))
     if flag:
         flag=False
         receive_data()
+        print(g_mode)
         if find_circle:
             find_circle=False
             pack_data()
-
     #print(flag)
     #print(clock.fps())
