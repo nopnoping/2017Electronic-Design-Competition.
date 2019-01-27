@@ -6,7 +6,7 @@
 2.当检测到小车的圆时，锁定小车。
 '''
 import sensor,image,time,struct,math
-from pyb import UART,LED,Timer
+from pyb import UART,LED,Timer,Pin
 threshold_black=[(0,100)]
 #找到小车返回飞控的数据帧
 def return_fc_find_car():
@@ -35,7 +35,7 @@ def lock_place_circle(circles):
     front_circle.r=current_circle.r
 #锁定小车
 def lock_car(circles):
-    global front_circle,current_circle,g_find_car,g_find_place_circle,g_find_flag
+    global front_circle,current_circle,g_find_car,g_find_place_circle,g_find_flag,g_cnt
     if g_find_car==0:
         #print("寻找小车")
         #寻找小车
@@ -58,7 +58,9 @@ def lock_car(circles):
                     current_circle.r=c.r()
         #图片中只有一个圆时，判断y坐标的偏移
         elif i==1:
-            if abs(current_circle.y-front_circle.y)>15 and g_find_flag:
+            if current_circle.x>35 and current_circle.x <45 and current_circle.y >25 and current_circle.y<35:
+                g_cnt+=1
+            if abs(current_circle.y-front_circle.y)>15 and g_find_flag :
                 g_find_car=1
         if g_find_place_circle:
             g_find_flag=1
@@ -81,7 +83,7 @@ def lock_car(circles):
         front_circle.r=current_circle.r
 #打包数据
 def pack_data():
-    global current_circle,g_mode,g_find_car
+    global current_circle,g_mode,g_find_car,g_cnt
     #锁定场地圆
     if g_mode==0:
         x_high=(current_circle.x&0xff00)>>8
@@ -105,8 +107,18 @@ def pack_data():
     elif g_mode==1 and g_find_car==0:
         x_high=(current_circle.x&0xff00)>>8
         x_low=current_circle.x&0xff
-        y_high=0
-        y_low=10
+        if g_cnt>50:
+            y_high=0
+            y_low=10
+            if x_low>42:
+                x_high=0
+                x_low=42
+            elif x_low<38:
+                x_high=0
+                x_low=38
+        else:
+            y_high=(current_circle.y&0xff00)>>8
+            y_low=current_circle.y&0xff
         SUM=(0xBB+0x60+0x06+0xBF+0x04+x_high+x_low+y_high+y_low)&0xff
         temp=struct.pack("<BBBBBBBBBB",
                             0xBB,       #帧头
@@ -185,7 +197,7 @@ flag=True
 g_find_car=0    #寻找小车，0时未找到，1时找到
 g_find_place_circle=0
 g_find_flag=0
-g_no_circle=0
+g_cnt=0
 #摄像头传感器设置
 sensor.reset()
 sensor.set_pixformat(sensor.GRAYSCALE)
@@ -202,6 +214,8 @@ timer.callback(over_time)
 led2=LED(2)
 led2.on()
 led3=LED(3)
+Key1=Pin('P0',Pin.IN,Pin.PULL_UP)
+Key2=Pin('P1',Pin.IN,Pin.PULL_UP)
 clock=time.clock()
 
 while True:
@@ -220,29 +234,23 @@ while True:
     if flag:
         flag=False
         #receive_data()
-        if uart.any()==7:
-            a=1
-        '''
-            a=uart.readline()
-            if a[0]==0xBB and a[1]==0x60 and a[2]==0x06:
-                mode=a[5]
-                SUM=(a[0]+a[1]+a[2]+a[3]+a[4]+a[5])&0xff
-                if SUM==a[6]:
-                    confirm_data()
-                    if mode==1:
-                        g_mode=0
-                        g_find_car=0
-                        g_find_place_circle=0
-                        g_find_flag=0
-                    elif mode==2:
-                        g_mode=1
-                        '''
+        #改变模式
+        if Key1.value() == 0:
+            g_mode=0
+            g_find_car=0
+            g_find_place_circle=0
+            g_find_flag=0
+            g_cnt=0
+        elif Key1.value()==1:
+            g_mode=1
+        #显示模式
         if g_mode==0:
             led2.on()
             led3.off()
         elif g_mode==1:
             led2.off()
             led3.on()
+        #发送串口
         if find_circle:
             find_circle=False
             pack_data()
